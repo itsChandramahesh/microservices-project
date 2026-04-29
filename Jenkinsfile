@@ -10,7 +10,7 @@ pipeline {
         // 🔹 1. Clone Repository
         stage('Clone Repository') {
             steps {
-                git 'YOUR_GITHUB_REPO_URL'
+                git 'https://github.com/itsChandramahesh/microservices-project'
             }
         }
 
