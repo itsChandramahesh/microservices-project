@@ -14,7 +14,20 @@ pipeline {
             }
         }
 
-        // 🔹 2. Test with Docker Compose (Local Integration Test)
+        // 🔹 2. Build Spring Boot (Maven)
+        stage('Build Spring Boot Services') {
+            steps {
+                sh '''
+                echo "Building Spring Boot services..."
+
+                cd user-service && mvn clean package -DskipTests
+                cd ../product-service && mvn clean package -DskipTests
+                cd ../order-service && mvn clean package -DskipTests
+                '''
+            }
+        }
+
+        // 🔹 3. Test with Docker Compose (Local Integration Test)
         stage('Docker Compose Test') {
             steps {
                 sh '''
@@ -26,19 +39,6 @@ pipeline {
                 sleep 20
 
                 docker-compose ps
-                '''
-            }
-        }
-
-        // 🔹 3. Build Spring Boot (Maven)
-        stage('Build Spring Boot Services') {
-            steps {
-                sh '''
-                echo "Building Spring Boot services..."
-
-                cd user-service && mvn clean package -DskipTests
-                cd ../product-service && mvn clean package -DskipTests
-                cd ../order-service && mvn clean package -DskipTests
                 '''
             }
         }
