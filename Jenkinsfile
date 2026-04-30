@@ -3,23 +3,20 @@ pipeline {
 
     environment {
         DOCKER_BUILDKIT = "1"
+        DOCKER_USER = "your-dockerhub-username"
     }
 
     stages {
 
-        // 🔹 1. Clone Repository
         stage('Clone Repository') {
             steps {
-                git branch: 'main' , url: 'https://github.com/itsChandramahesh/microservices-project'
+                git branch: 'main', url: 'https://github.com/itsChandramahesh/microservices-project'
             }
         }
 
-        // 🔹 2. Build Spring Boot (Maven)
         stage('Build Spring Boot Services') {
             steps {
                 sh '''
-                echo "Building Spring Boot services..."
-
                 cd user-service && mvn clean package -DskipTests
                 cd ../product-service && mvn clean package -DskipTests
                 cd ../order-service && mvn clean package -DskipTests
@@ -27,86 +24,64 @@ pipeline {
             }
         }
 
-        // 🔹 3. Test with Docker Compose (Local Integration Test)
         stage('Docker Compose Test') {
             steps {
                 sh '''
-                echo "Starting docker-compose for testing..."
-
                 docker-compose down || true
                 docker-compose up -d --build
-
                 sleep 20
-
                 docker-compose ps
                 '''
             }
         }
 
-        // 🔹 4. Build Docker Images (All Services)
         stage('Build Docker Images') {
             steps {
                 sh '''
-                echo "Building Docker images..."
+                docker build -t $DOCKER_USER/user-service ./user-service
+                docker build -t $DOCKER_USER/product-service ./product-service
+                docker build -t $DOCKER_USER/order-service ./order-service
 
-                docker build -t user-service ./user-service
-                docker build -t product-service ./product-service
-                docker build -t order-service ./order-service
+                docker build -t $DOCKER_USER/payment-service ./payment-service
+                docker build -t $DOCKER_USER/notification-service ./notification-service
+                docker build -t $DOCKER_USER/analytics-service ./analytics-service
 
-                docker build -t payment-service ./payment-service
-                docker build -t notification-service ./notification-service
-                docker build -t analytics-service ./analytics-service
-
-                docker build -t frontend ./order-frontend
+                docker build -t $DOCKER_USER/frontend ./order-frontend
                 '''
             }
         }
 
-        // 🔹 5. Stop Docker Compose (cleanup)
-        stage('Stop Compose') {
+        stage('Push to Docker Hub') {
             steps {
-                sh '''
-                docker-compose down
-                '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'mahesh9154', passwordVariable: 'Chandra@2002')]) {
+                    sh '''
+                    echo "$PASS" | docker login -u "$USER" --password-stdin
+
+                    docker push $DOCKER_USER/user-service
+                    docker push $DOCKER_USER/product-service
+                    docker push $DOCKER_USER/order-service
+
+                    docker push $DOCKER_USER/payment-service
+                    docker push $DOCKER_USER/notification-service
+                    docker push $DOCKER_USER/analytics-service
+
+                    docker push $DOCKER_USER/frontend
+                    '''
+                }
             }
         }
 
-        // 🔹 6. Load Images into Minikube
-        stage('Load Images to Minikube') {
-            steps {
-                sh '''
-                echo "Loading images into Minikube..."
-
-                minikube image load user-service
-                minikube image load product-service
-                minikube image load order-service
-
-                minikube image load payment-service
-                minikube image load notification-service
-                minikube image load analytics-service
-
-                minikube image load frontend
-                '''
-            }
-        }
-
-        // 🔹 7. Deploy to Kubernetes
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                echo "Deploying to Kubernetes..."
-
                 kubectl apply -f k8s/
                 '''
             }
         }
 
-        // 🔹 8. Verify Deployment
         stage('Verify Deployment') {
             steps {
                 sh '''
-                echo "Checking deployment..."
-
                 kubectl get pods
                 kubectl get svc
                 '''
