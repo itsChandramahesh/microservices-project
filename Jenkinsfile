@@ -1,16 +1,40 @@
 pipeline {
     agent any
 
+    tools {
+        jdk 'jdk-21'          // 🔥 IMPORTANT: Configure this in Jenkins
+        maven 'maven-3'       // Ensure Maven is configured
+    }
+
     environment {
         DOCKER_BUILDKIT = "1"
+        JAVA_HOME = tool name: 'jdk-21', type: 'jdk'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
 
     stages {
 
+        // 🔹 0. Debug Environment (VERY IMPORTANT)
+        stage('Check Environment') {
+            steps {
+                sh '''
+                echo "Java Version:"
+                java -version
+                javac -version
+
+                echo "Maven Version:"
+                mvn -version
+
+                echo "Docker Version:"
+                docker --version
+                '''
+            }
+        }
+
         // 🔹 1. Clone Repository
         stage('Clone Repository') {
             steps {
-                git branch: 'main' , url: 'https://github.com/itsChandramahesh/microservices-project'
+                git branch: 'main', url: 'https://github.com/itsChandramahesh/microservices-project'
             }
         }
 
@@ -20,14 +44,19 @@ pipeline {
                 sh '''
                 echo "Building Spring Boot services..."
 
-                cd user-service && mvn clean package -DskipTests
-                cd ../product-service && mvn clean package -DskipTests
-                cd ../order-service && mvn clean package -DskipTests
+                cd user-service
+                mvn clean package -DskipTests
+
+                cd ../product-service
+                mvn clean package -DskipTests
+
+                cd ../order-service
+                mvn clean package -DskipTests
                 '''
             }
         }
 
-        // 🔹 3. Test with Docker Compose (Local Integration Test)
+        // 🔹 3. Test with Docker Compose
         stage('Docker Compose Test') {
             steps {
                 sh '''
@@ -36,14 +65,15 @@ pipeline {
                 docker-compose down || true
                 docker-compose up -d --build
 
-                sleep 20
+                echo "Waiting for services..."
+                sleep 30
 
                 docker-compose ps
                 '''
             }
         }
 
-        // 🔹 4. Build Docker Images (All Services)
+        // 🔹 4. Build Docker Images
         stage('Build Docker Images') {
             steps {
                 sh '''
@@ -62,12 +92,10 @@ pipeline {
             }
         }
 
-        // 🔹 5. Stop Docker Compose (cleanup)
+        // 🔹 5. Stop Docker Compose
         stage('Stop Compose') {
             steps {
-                sh '''
-                docker-compose down
-                '''
+                sh 'docker-compose down'
             }
         }
 
