@@ -25,7 +25,7 @@ pipeline {
             }
         }
 
-        // 🔹 3. Integration Test
+        // 🔹 3. Docker Compose Test
         stage('Docker Compose Test') {
             steps {
                 sh '''
@@ -38,55 +38,42 @@ pipeline {
             }
         }
 
-        // 🔹 4. Build Docker Images
-        stage('Build Docker Images') {
+        // 🔥 4. Start Minikube
+        stage('Start Minikube') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                    echo "Building images..."
+                sh '''
+                echo "Starting Minikube..."
 
-                    docker build -t $DOCKER_USER/user-service:latest ./user-service
-                    docker build -t $DOCKER_USER/product-service:latest ./product-service
-                    docker build -t $DOCKER_USER/order-service:latest ./order-service
+                if ! minikube status | grep -q "Running"; then
+                    minikube start --driver=docker
+                fi
 
-                    docker build -t $DOCKER_USER/payment-service:latest ./payment-service
-                    docker build -t $DOCKER_USER/notification-service:latest ./notification-service
-                    docker build -t $DOCKER_USER/analytics-service:latest ./analytics-service
-
-                    docker build -t $DOCKER_USER/frontend:latest ./order-frontend
-                    '''
-                }
+                kubectl config use-context minikube
+                kubectl get nodes
+                '''
             }
         }
 
-        // 🔹 5. Push Images
-        stage('Push to Docker Hub') {
+        // 🔥 5. Build Images INSIDE Minikube
+        stage('Build Images in Minikube') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                sh '''
+                echo "Switching to Minikube Docker..."
 
-                    echo "Pushing images..."
+                eval $(minikube docker-env)
 
-                    docker push $DOCKER_USER/user-service:latest
-                    docker push $DOCKER_USER/product-service:latest
-                    docker push $DOCKER_USER/order-service:latest
+                docker build -t user-service ./user-service
+                docker build -t product-service ./product-service
+                docker build -t order-service ./order-service
 
-                    docker push $DOCKER_USER/payment-service:latest
-                    docker push $DOCKER_USER/notification-service:latest
-                    docker push $DOCKER_USER/analytics-service:latest
+                docker build -t payment-service ./payment-service
+                docker build -t notification-service ./notification-service
+                docker build -t analytics-service ./analytics-service
 
-                    docker push $DOCKER_USER/frontend:latest
-                    '''
-                }
+                docker build -t frontend ./order-frontend
+
+                docker images
+                '''
             }
         }
 
@@ -98,7 +85,6 @@ pipeline {
 
                 kubectl apply -f k8s/
 
-                echo "Waiting for pods..."
                 sleep 15
                 '''
             }
