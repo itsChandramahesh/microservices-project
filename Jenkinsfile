@@ -52,23 +52,42 @@ pipeline {
         }
 
         stage('Push to Docker Hub') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh '''
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                    docker push $DOCKER_USER/user-service
-                    docker push $DOCKER_USER/product-service
-                    docker push $DOCKER_USER/order-service
+            echo "Tagging images..."
 
-                    docker push $DOCKER_USER/payment-service
-                    docker push $DOCKER_USER/notification-service
-                    docker push $DOCKER_USER/analytics-service
+            docker tag user-service $DOCKER_USER/user-service
+            docker tag product-service $DOCKER_USER/product-service
+            docker tag order-service $DOCKER_USER/order-service
 
-                    docker push $DOCKER_USER/frontend
-                    '''
-                }
-            }
+            docker tag payment-service $DOCKER_USER/payment-service
+            docker tag notification-service $DOCKER_USER/notification-service
+            docker tag analytics-service $DOCKER_USER/analytics-service
+
+            docker tag frontend $DOCKER_USER/frontend
+
+            echo "Pushing images..."
+
+            docker push $DOCKER_USER/user-service
+            docker push $DOCKER_USER/product-service
+            docker push $DOCKER_USER/order-service
+
+            docker push $DOCKER_USER/payment-service
+            docker push $DOCKER_USER/notification-service
+            docker push $DOCKER_USER/analytics-service
+
+            docker push $DOCKER_USER/frontend
+            '''
+        }
+    }
+}
         }
 
         stage('Deploy to Kubernetes') {
