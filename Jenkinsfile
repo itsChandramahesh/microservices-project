@@ -40,19 +40,36 @@ pipeline {
 
         // 🔥 4. Start Minikube
         stage('Start Minikube') {
-            steps {
-                sh '''
-                echo "Starting Minikube..."
+    steps {
+        sh '''
+        echo "🔧 Setting up Minikube..."
 
-                if ! minikube status | grep -q "Running"; then
-                    minikube start --driver=docker
-                fi
+        # Clean broken cluster if exists
+        minikube delete || true
 
-                kubectl config use-context minikube
-                kubectl get nodes
-                '''
-            }
-        }
+        echo "🚀 Starting Minikube..."
+
+        minikube start \
+          --driver=docker \
+          --memory=4096 \
+          --cpus=2 \
+          --kubernetes-version=v1.28.3 \
+          --force
+
+        echo "⏳ Waiting for Kubernetes API..."
+
+        # Wait until node is ready
+        kubectl wait --for=condition=Ready node/minikube --timeout=120s
+
+        echo "📌 Setting context..."
+        kubectl config use-context minikube
+
+        echo "📊 Cluster status:"
+        kubectl get nodes
+        kubectl get pods -A
+        '''
+    }
+}
 
         // 🔥 5. Build Images INSIDE Minikube
         stage('Build Images in Minikube') {
