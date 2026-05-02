@@ -38,46 +38,30 @@ pipeline {
             }
         }
 
-        // 🔥 4. Start Minikube
-        stage('Start Minikube') {
-    steps {
-        sh '''
-        echo "🔧 Setting up Minikube..."
-
-        # Clean broken cluster if exists
-        minikube delete || true
-
-        echo "🚀 Starting Minikube..."
-
-        minikube start \
-          --driver=docker \
-          --memory=4096 \
-          --cpus=2 \
-          --kubernetes-version=v1.28.3 \
-          --force
-
-        echo "⏳ Waiting for Kubernetes API..."
-
-        # Wait until node is ready
-        kubectl wait --for=condition=Ready node/minikube --timeout=120s
-
-        echo "📌 Setting context..."
-        kubectl config use-context minikube
-
-        echo "📊 Cluster status:"
-        kubectl get nodes
-        kubectl get pods -A
-        '''
-    }
-}
-
-        // 🔥 5. Build Images INSIDE Minikube
-        stage('Build Images in Minikube') {
+        // 🔥 4. Setup KIND Cluster
+        stage('Setup KIND Cluster') {
             steps {
                 sh '''
-                echo "Switching to Minikube Docker..."
+                echo "🔧 Setting up KIND cluster..."
 
-                eval $(minikube docker-env)
+                # Delete old cluster if exists
+                kind delete cluster || true
+
+                # Create new cluster
+                kind create cluster --name dev-cluster
+
+                echo "📌 Verifying cluster..."
+                kubectl cluster-info
+                kubectl get nodes
+                '''
+            }
+        }
+
+        // 🔥 5. Build Docker Images (LOCAL)
+        stage('Build Docker Images') {
+            steps {
+                sh '''
+                echo "Building Docker images..."
 
                 docker build -t user-service ./user-service
                 docker build -t product-service ./product-service
@@ -94,7 +78,26 @@ pipeline {
             }
         }
 
-        // 🔹 6. Deploy to Kubernetes
+        // 🔥 6. Load Images into KIND
+        stage('Load Images to KIND') {
+            steps {
+                sh '''
+                echo "Loading images into KIND..."
+
+                kind load docker-image user-service --name dev-cluster
+                kind load docker-image product-service --name dev-cluster
+                kind load docker-image order-service --name dev-cluster
+
+                kind load docker-image payment-service --name dev-cluster
+                kind load docker-image notification-service --name dev-cluster
+                kind load docker-image analytics-service --name dev-cluster
+
+                kind load docker-image frontend --name dev-cluster
+                '''
+            }
+        }
+
+        // 🔹 7. Deploy to Kubernetes
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
@@ -102,16 +105,19 @@ pipeline {
 
                 kubectl apply -f k8s/
 
-                sleep 15
+                echo "⏳ Waiting for pods..."
+                kubectl wait --for=condition=Ready pods --all --timeout=180s
                 '''
             }
         }
 
-        // 🔹 7. Verify
+        // 🔹 8. Verify
         stage('Verify Deployment') {
             steps {
                 sh '''
-                kubectl get pods
+                echo "📊 Deployment status..."
+
+                kubectl get pods -o wide
                 kubectl get svc
                 '''
             }
@@ -120,7 +126,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ CI/CD Pipeline Completed Successfully!'
+            echo '✅ CI/CD Pipeline Completed Successfully with KIND!'
         }
         failure {
             echo '❌ Pipeline Failed. Check logs.'
