@@ -15,6 +15,7 @@ spec:
       containers:
       - name: product-service
         image: product-service
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
 ---

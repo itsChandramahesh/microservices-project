@@ -15,6 +15,7 @@ spec:
       containers:
       - name: analytics-service
         image: analytics-service
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5003
 ---
