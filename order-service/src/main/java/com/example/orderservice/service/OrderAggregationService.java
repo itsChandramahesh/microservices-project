@@ -18,6 +18,10 @@ public class OrderAggregationService {
     private final String productServiceFallbackUrl;
     private final String paymentServiceUrl;
     private final String paymentServiceFallbackUrl;
+    private final String notificationServiceUrl;
+    private final String notificationServiceFallbackUrl;
+    private final String analyticsServiceUrl;
+    private final String analyticsServiceFallbackUrl;
 
     public OrderAggregationService(
             RestTemplate restTemplate,
@@ -26,7 +30,11 @@ public class OrderAggregationService {
             @Value("${services.product.primary-url}") String productServiceUrl,
             @Value("${services.product.fallback-url}") String productServiceFallbackUrl,
             @Value("${services.payment.primary-url}") String paymentServiceUrl,
-            @Value("${services.payment.fallback-url}") String paymentServiceFallbackUrl) {
+            @Value("${services.payment.fallback-url}") String paymentServiceFallbackUrl,
+            @Value("${services.notification.primary-url}") String notificationServiceUrl,
+            @Value("${services.notification.fallback-url}") String notificationServiceFallbackUrl,
+            @Value("${services.analytics.primary-url}") String analyticsServiceUrl,
+            @Value("${services.analytics.fallback-url}") String analyticsServiceFallbackUrl) {
         this.restTemplate = restTemplate;
         this.userServiceUrl = userServiceUrl;
         this.userServiceFallbackUrl = userServiceFallbackUrl;
@@ -34,6 +42,10 @@ public class OrderAggregationService {
         this.productServiceFallbackUrl = productServiceFallbackUrl;
         this.paymentServiceUrl = paymentServiceUrl;
         this.paymentServiceFallbackUrl = paymentServiceFallbackUrl;
+        this.notificationServiceUrl = notificationServiceUrl;
+        this.notificationServiceFallbackUrl = notificationServiceFallbackUrl;
+        this.analyticsServiceUrl = analyticsServiceUrl;
+        this.analyticsServiceFallbackUrl = analyticsServiceFallbackUrl;
     }
 
     public Map<String, Object> placeOrder() {
@@ -41,6 +53,8 @@ public class OrderAggregationService {
         response.put("user", getStringWithFallback(userServiceUrl, userServiceFallbackUrl));
         response.put("product", getStringWithFallback(productServiceUrl, productServiceFallbackUrl));
         response.put("payment", postWithFallback(paymentServiceUrl, paymentServiceFallbackUrl));
+        response.put("notification", postWithFallback(notificationServiceUrl, notificationServiceFallbackUrl));
+        response.put("analytics", postWithFallback(analyticsServiceUrl, analyticsServiceFallbackUrl));
         response.put("message", "Order placed successfully");
         return response;
     }

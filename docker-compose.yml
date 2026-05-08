@@ -17,6 +17,8 @@ services:
       - user-service
       - product-service
       - payment-service
+      - notification-service
+      - analytics-service
 
   payment-service:
     build: ./payment-service
