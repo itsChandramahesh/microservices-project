@@ -2,8 +2,8 @@ FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /app  
 
-COPY target/*.jar app.jar  
+COPY target/*.jar app.jar
 
-EXPOSE 8081
+EXPOSE 8083
 
 ENTRYPOINT ["java","-jar","app.jar"]
