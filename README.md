@@ -39,3 +39,7 @@ npm run dev
 ## Notes
 
 The order service is configured for service-to-service calls using hostnames like `user-service` and also includes localhost fallbacks for simple local training runs.
+
+The frontend calls `/api/order` by default. In local Vite development, that path is proxied to `http://localhost:8083`. In the containerized frontend, Nginx proxies `/api/order` to the Kubernetes or Docker service name `order-service:8083`.
+
+If you want a custom frontend backend target at build time, set `VITE_ORDER_API_URL`.

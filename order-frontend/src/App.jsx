@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const orderApiUrl = import.meta.env.VITE_ORDER_API_URL || "/api/order";
+
 export default function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -10,7 +12,7 @@ export default function App() {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8083/order", {
+      const response = await fetch(orderApiUrl, {
         method: "POST"
       });
 
