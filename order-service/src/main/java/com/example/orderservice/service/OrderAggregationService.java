@@ -1,5 +1,9 @@
 package com.example.orderservice.service;
 
+import com.example.orderservice.dto.OrderRequest;
+import com.example.orderservice.model.OrderRecord;
+import com.example.orderservice.repository.OrderRepository;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,10 +16,11 @@ import org.springframework.web.client.RestTemplate;
 public class OrderAggregationService {
 
     private final RestTemplate restTemplate;
-    private final String userServiceUrl;
-    private final String userServiceFallbackUrl;
-    private final String productServiceUrl;
-    private final String productServiceFallbackUrl;
+    private final OrderRepository orderRepository;
+    private final String userServiceBaseUrl;
+    private final String userServiceFallbackBaseUrl;
+    private final String productServiceBaseUrl;
+    private final String productServiceFallbackBaseUrl;
     private final String paymentServiceUrl;
     private final String paymentServiceFallbackUrl;
     private final String notificationServiceUrl;
@@ -25,10 +30,11 @@ public class OrderAggregationService {
 
     public OrderAggregationService(
             RestTemplate restTemplate,
-            @Value("${services.user.primary-url}") String userServiceUrl,
-            @Value("${services.user.fallback-url}") String userServiceFallbackUrl,
-            @Value("${services.product.primary-url}") String productServiceUrl,
-            @Value("${services.product.fallback-url}") String productServiceFallbackUrl,
+            OrderRepository orderRepository,
+            @Value("${services.user.primary-base-url}") String userServiceBaseUrl,
+            @Value("${services.user.fallback-base-url}") String userServiceFallbackBaseUrl,
+            @Value("${services.product.primary-base-url}") String productServiceBaseUrl,
+            @Value("${services.product.fallback-base-url}") String productServiceFallbackBaseUrl,
             @Value("${services.payment.primary-url}") String paymentServiceUrl,
             @Value("${services.payment.fallback-url}") String paymentServiceFallbackUrl,
             @Value("${services.notification.primary-url}") String notificationServiceUrl,
@@ -36,10 +42,11 @@ public class OrderAggregationService {
             @Value("${services.analytics.primary-url}") String analyticsServiceUrl,
             @Value("${services.analytics.fallback-url}") String analyticsServiceFallbackUrl) {
         this.restTemplate = restTemplate;
-        this.userServiceUrl = userServiceUrl;
-        this.userServiceFallbackUrl = userServiceFallbackUrl;
-        this.productServiceUrl = productServiceUrl;
-        this.productServiceFallbackUrl = productServiceFallbackUrl;
+        this.orderRepository = orderRepository;
+        this.userServiceBaseUrl = userServiceBaseUrl;
+        this.userServiceFallbackBaseUrl = userServiceFallbackBaseUrl;
+        this.productServiceBaseUrl = productServiceBaseUrl;
+        this.productServiceFallbackBaseUrl = productServiceFallbackBaseUrl;
         this.paymentServiceUrl = paymentServiceUrl;
         this.paymentServiceFallbackUrl = paymentServiceFallbackUrl;
         this.notificationServiceUrl = notificationServiceUrl;
@@ -48,22 +55,56 @@ public class OrderAggregationService {
         this.analyticsServiceFallbackUrl = analyticsServiceFallbackUrl;
     }
 
-    public Map<String, Object> placeOrder() {
+    public Map<String, Object> placeOrder(OrderRequest orderRequest) {
+        Long userId = orderRequest != null && orderRequest.getUserId() != null ? orderRequest.getUserId() : 1L;
+        Long productId = orderRequest != null && orderRequest.getProductId() != null ? orderRequest.getProductId() : 101L;
+
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("user", getStringWithFallback(userServiceUrl, userServiceFallbackUrl));
-        response.put("product", getStringWithFallback(productServiceUrl, productServiceFallbackUrl));
-        response.put("payment", postWithFallback(paymentServiceUrl, paymentServiceFallbackUrl));
-        response.put("notification", postWithFallback(notificationServiceUrl, notificationServiceFallbackUrl));
-        response.put("analytics", postWithFallback(analyticsServiceUrl, analyticsServiceFallbackUrl));
+        Map<String, Object> user = getObjectWithFallback(
+                buildResourceUrl(userServiceBaseUrl, userId),
+                buildResourceUrl(userServiceFallbackBaseUrl, userId));
+        Map<String, Object> product = getObjectWithFallback(
+                buildResourceUrl(productServiceBaseUrl, productId),
+                buildResourceUrl(productServiceFallbackBaseUrl, productId));
+        Map<String, Object> payment = postWithFallback(paymentServiceUrl, paymentServiceFallbackUrl);
+        Map<String, Object> notification = postWithFallback(notificationServiceUrl, notificationServiceFallbackUrl);
+        Map<String, Object> analytics = postWithFallback(analyticsServiceUrl, analyticsServiceFallbackUrl);
+
+        OrderRecord orderRecord = new OrderRecord();
+        orderRecord.setUserId(userId);
+        orderRecord.setProductId(productId);
+        orderRecord.setPaymentStatus(getStatusValue(payment));
+        orderRecord.setNotificationStatus(getStatusValue(notification));
+        orderRecord.setAnalyticsStatus(getStatusValue(analytics));
+        orderRecord.setCreatedAt(LocalDateTime.now());
+
+        OrderRecord savedOrder = orderRepository.save(orderRecord);
+
+        response.put("orderId", savedOrder.getId());
+        response.put("user", user);
+        response.put("product", product);
+        response.put("payment", payment);
+        response.put("notification", notification);
+        response.put("analytics", analytics);
         response.put("message", "Order placed successfully");
         return response;
     }
 
-    private String getStringWithFallback(String primaryUrl, String fallbackUrl) {
+    private String buildResourceUrl(String baseUrl, Long id) {
+        return baseUrl.endsWith("/") ? baseUrl + id : baseUrl + "/" + id;
+    }
+
+    private String getStatusValue(Map<String, Object> serviceResponse) {
+        Object status = serviceResponse.get("status");
+        return status != null ? status.toString() : "UNKNOWN";
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getObjectWithFallback(String primaryUrl, String fallbackUrl) {
         try {
-            return restTemplate.getForObject(primaryUrl, String.class);
+            return restTemplate.getForObject(primaryUrl, Map.class);
         } catch (RestClientException exception) {
-            return restTemplate.getForObject(fallbackUrl, String.class);
+            return restTemplate.getForObject(fallbackUrl, Map.class);
         }
     }
 

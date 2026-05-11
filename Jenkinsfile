@@ -29,11 +29,17 @@ pipeline {
         stage('Docker Compose Test') {
             steps {
                 sh '''
-                docker-compose down || true
-                docker-compose up -d --build
-                sleep 20
-                docker-compose ps
-                docker-compose down
+                if docker compose version >/dev/null 2>&1; then
+                  COMPOSE_CMD="docker compose"
+                else
+                  COMPOSE_CMD="docker-compose"
+                fi
+
+                $COMPOSE_CMD down || true
+                $COMPOSE_CMD up -d --build
+                sleep 35
+                $COMPOSE_CMD ps
+                $COMPOSE_CMD down
                 '''
             }
         }
@@ -102,7 +108,14 @@ pipeline {
 
                 kubectl apply -f k8s/
 
-                sleep 15
+                kubectl rollout status deployment/postgres-db --timeout=180s
+                kubectl rollout status deployment/user-service --timeout=180s
+                kubectl rollout status deployment/product-service --timeout=180s
+                kubectl rollout status deployment/order-service --timeout=180s
+                kubectl rollout status deployment/payment-service --timeout=180s
+                kubectl rollout status deployment/notification-service --timeout=180s
+                kubectl rollout status deployment/analytics-service --timeout=180s
+                kubectl rollout status deployment/frontend --timeout=180s
                 '''
             }
         }
